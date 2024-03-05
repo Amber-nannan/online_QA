@@ -3,8 +3,9 @@ import os
 import pandas as pd
 from openai import OpenAI
 from dotenv import load_dotenv
-os.environ["http_proxy"] = "http://127.0.0.1:33210"
-os.environ["https_proxy"] = "http://127.0.0.1:33210"
+
+# os.environ["http_proxy"] = "http://localhost:33210"
+# os.environ["https_proxy"] = "http://localhost:33210"   # 开梯子时要加上，33210是我电脑上梯子的端口
 
 class OpenAILLM():
     def __init__(self, api_key, base_url, kwargs):
