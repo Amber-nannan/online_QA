@@ -11,8 +11,8 @@ os.environ["http_proxy"] = "http://localhost:33210"
 os.environ["https_proxy"] = "http://localhost:33210"   # 开梯子时要加上，33210是我电脑上梯子的端口
 
 batch_size = 20
-api_key1 = 'sk-8R00Cji00bDcWyy895DfF9887104477b9015B51b3157C8E5'
-api_key2 = 'sk-VktPzWjyo7Z3HYOw734a77C3AfD34f04B447BeCaA39dF274'
+api_key1 = 'sk-8R00Cji00bDcWyy895DfF9887104477b9015B51b3157C8E5'  # 学校的
+api_key2 = 'sk-VktPzWjyo7Z3HYOw734a77C3AfD34f04B447BeCaA39dF274'  # 淘宝的
 kwargs = {"temperature":0}
 logging.basicConfig(level=logging.INFO)
 
@@ -51,9 +51,9 @@ def main():
     base_url2 = 'https://api.chatgptid.net/v1'
     tasks_params = [
         (40,api_key1, base_url1, kwargs, r'classification_gpt\clf1\filtered_clf1.csv'),
-        (40,api_key1, base_url1, kwargs, r'classification_gpt\clf2\filtered_clf2.csv'),
-        (0,api_key1, base_url1, kwargs, r'classification_gpt\clf3\filtered_clf3.csv'),
-        (0,api_key1, base_url1, kwargs, r'classification_gpt\clf4\filtered_clf4.csv')
+        # (40,api_key1, base_url1, kwargs, r'classification_gpt\clf2\filtered_clf2.csv'),
+        # (0,api_key1, base_url1, kwargs, r'classification_gpt\clf3\filtered_clf3.csv'),
+        # (0,api_key1, base_url1, kwargs, r'classification_gpt\clf4\filtered_clf4.csv')
     ]
 
     # 启动并行进程执行任务

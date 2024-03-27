@@ -1,11 +1,13 @@
 import re
 import os
+import json
 import pandas as pd
+import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# os.environ["http_proxy"] = "http://localhost:33210"
-# os.environ["https_proxy"] = "http://localhost:33210"   # 开梯子时要加上，33210是我电脑上梯子的端口
+os.environ["http_proxy"] = "http://localhost:33210"
+os.environ["https_proxy"] = "http://localhost:33210"   # 开梯子时要加上，33210是我电脑上梯子的端口
 
 class OpenAILLM():
     def __init__(self, api_key, base_url, kwargs):
@@ -22,64 +24,69 @@ class OpenAILLM():
         result = response.choices[0].message.content
         return result
 
-def get_prompt(prompt_template, help_post, *convs):
+def generate_conv(gpt, prompt_template, row, num_round):
     '''
-    如果convs为空，则返回第一轮对话的prompt
-    如果convs长度为1，则返回第二轮对话的prompt
-    如果convs长度为2，则返回第三轮对话的prompt，以此类推
+    为一行row生成num_rounds轮对话
     '''
-    round_num = len(convs) + 1
-    prompt = re.findall(fr'([\w\W]+对话{round_num}：)', prompt_template)[0]
-    prompt = prompt.replace('{help_post}', help_post)
-    for i, conv in enumerate(convs):
-        prompt = prompt.replace(f'{{conv{i+1}}}', conv)
-    return prompt
-
-def generate_conv(gpt, prompt_template, df, num_round):
-    '''
-    生成第num_rounds轮对话
-    '''
-    prompts = []
-    for i in range(len(df)):
-        help_post = df['help_post'][i]
-        convs = []
-        for j in range(1,num_round+1):
-            if j >1:
-                convs.append(df[f'conv{j-1}'][i])
-        prompt = get_prompt(prompt_template, help_post, *convs)
-        prompts.append(prompt)
-    
-    responses = []
-    for prompt in prompts:
-        response = gpt.generate(prompt)
-        responses.append(response)
-    
-    df[f'conv{num_round}'] = responses
-    return df
+    history = []
+    convs = []
+    for i in range(1,num_round+1):
+        input = json.dumps({"post": row['post'], "history": history},ensure_ascii=False)
+        prompt = prompt_template.replace('<input>', input)
+        question = gpt.generate(prompt)
+        answer = gpt.generate('请你以财经专家或统计专家的身份回答问题：'+question)
+        conv_json = {
+            "instruction": question,
+            "output": answer,
+            "history": history.copy()
+        }
+        convs.append(conv_json)
+        history.append([question, answer])
+    return convs  
 
 def main():
     load_dotenv()
-    api_key = os.environ.get("api_key")
-    base_url = os.environ.get("base_url")
+    api_key = os.environ.get('api_key')
+    base_url = os.environ.get('base_url')
     kwargs = {
         "temperature": 0.3
     }
     gpt = OpenAILLM(api_key,base_url,kwargs)
+    num_round = 3
+    batch_size = 10
+    start_row = 0
     
-    with open("prompt_template.txt", 'r', encoding='utf-8') as prompt_file:
+    with open("prompts\\gen_Q_template.txt", 'r', encoding='utf-8') as prompt_file:
         prompt_template = prompt_file.read()
-
-    df_ = pd.read_csv(r'online_QA.csv', encoding='utf-8')
-    df_ = generate_conv(gpt, prompt_template, df_, 1)
-    df_ = generate_conv(gpt, prompt_template, df_, 2)
-    df_ = generate_conv(gpt, prompt_template, df_, 3)
-    df_.to_csv('online_QA.csv', encoding='utf-8', index=False)
-
-
+    
+    df_ = pd.read_csv(r'Data\filtered_questions.csv', encoding='utf-8')  
+    result = []
+    for index, row in df_.iloc[start_row:].iterrows():  # 从选定的行开始迭代
+        logging.info(f'Processing {index}...')
+        convs = generate_conv(gpt, prompt_template, row, num_round)
+        result.extend(convs)
+        
+        if (index - start_row + 1) % batch_size == 0:
+            start_index = index + 1 - batch_size
+            end_index = index
+            with open(f'Data\\from_{start_index}_to_{end_index}.json', 'w', encoding='utf-8') as file:
+                json.dump(result, file, indent=4, ensure_ascii=False)
+            result = []
+        
 if __name__ == "__main__":
     main()
 
 """
-现在是逐轮产生对话，即产生完所有帖子的第一轮对话，再产生所有帖子的第二轮对话，以此类推
-后面改成逐帖子产生对话可能更好，即产生一个帖子的n轮，再产生下一个帖子的n轮，以此类推，每完成m个帖子的n轮对话，就保存一次
+生成逻辑：逐帖子产生对话，即产生一个帖子的n轮，再产生下一个帖子的n轮，以此类推，每完成m个帖子的n轮对话，就保存一次
 """
+# %%
+# # 计算'Data\\from_0_to_3.json'中output的平均长度
+# import json
+# import pandas as pd
+# with open('Data\\from_0_to_20.json', 'r', encoding='utf-8') as file:
+#     data = json.load(file)
+
+# output_lengths = [len(item['output']) for item in data]
+# average_length = sum(output_lengths) / len(output_lengths)
+# print(f"Average output length: {average_length}")
+# %%
