@@ -1,21 +1,22 @@
 import re
 import os
 import json
+import time
 import pandas as pd
 import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO,filename='output.log')
 os.environ["http_proxy"] = "http://localhost:33210"
 os.environ["https_proxy"] = "http://localhost:33210"   # 开梯子时要加上，33210是我电脑上梯子的端口
 load_dotenv()
-api_key = 'sk-60kV9nDoV5LSZfeq24Fc7f63F1Bc4216A091E7Fb45EeA604'
-base_url = 'https://api.chatgptid.net/v1'
+api_key = os.environ.get("api_key")
+base_url = os.environ.get("base_url")
 kwargs = {"temperature": 0.3}
 num_round = 3
 batch_size = 10
-start_row = 0
+start_row = 1460
 
 class OpenAILLM():
     def __init__(self, api_key, base_url, kwargs):
@@ -40,20 +41,31 @@ def generate_conv(gpt, Q_prompt_template,A_prompt_template, row, num_round):
     convs = []
     for i in range(1,num_round+1):
         input = json.dumps({"post": row['post'], "history": history},ensure_ascii=False)
-        Q_prompt = Q_prompt_template.replace('<input>', input)
-        question = gpt.generate(Q_prompt)
-        A_prompt = A_prompt_template.replace('<question>', question)
-        answer = gpt.generate(A_prompt)
+        while True:
+            try:
+                Q_prompt = Q_prompt_template.replace('<input>', input)
+                question = gpt.generate(Q_prompt)
+                A_prompt = A_prompt_template.replace('<question>', question)
+                answer = gpt.generate(A_prompt)
+                break  # 如果没有出现错误，则退出循环
+            except Exception as e:
+                print("程序出错:", e)
+                print("等待10秒后重新运行...")
+                time.sleep(10)
         conv_json = {
             "instruction": question,
             "output": answer,
             "history": history.copy()
         }
         convs.append(conv_json)
+        
         history.append([question, answer])
     return convs  
 
 def main():
+    """
+    逐帖子产生对话，即产生一个帖子的n轮，再产生下一个帖子的n轮，以此类推，每完成m个帖子的n轮对话，就保存一次
+    """
     gpt = OpenAILLM(api_key,base_url,kwargs) 
     with open("prompts\\gen_Q_template.txt", 'r', encoding='utf-8') as prompt_file:
         Q_prompt_template = prompt_file.read()
@@ -75,11 +87,8 @@ def main():
 if __name__ == "__main__":
     main()
 
-"""
-生成逻辑：逐帖子产生对话，即产生一个帖子的n轮，再产生下一个帖子的n轮，以此类推，每完成m个帖子的n轮对话，就保存一次
-"""
-
 # %%
+# 合并 json 文件
 import json
 result = []
 for file_name in os.listdir('Data'):
@@ -87,14 +96,14 @@ for file_name in os.listdir('Data'):
         with open(f'Data/{file_name}', 'r', encoding='utf-8') as file:
             data = json.load(file)
             result.extend(data)
-
-with open('Data\\online_QA.json', 'w', encoding='utf-8') as file:
+with open('Data\\my_data.json', 'w', encoding='utf-8') as file:
     json.dump(result, file, indent=4, ensure_ascii=False)
     
 # 计算output的平均长度
-with open('Data\\online_QA.json', 'r', encoding='utf-8') as file:
+with open('Data\\my_data.json', 'r', encoding='utf-8') as file:
     data = json.load(file)
 
 output_lengths = [len(item['output']) for item in data]
 average_length = sum(output_lengths) / len(output_lengths)
 print(f"Average output length: {average_length}")
+# %%
