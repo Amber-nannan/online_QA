@@ -102,8 +102,7 @@ with open('Data\\my_data.json', 'w', encoding='utf-8') as file:
 # 计算output的平均长度
 with open('Data\\my_data.json', 'r', encoding='utf-8') as file:
     data = json.load(file)
-
 output_lengths = [len(item['output']) for item in data]
 average_length = sum(output_lengths) / len(output_lengths)
 print(f"Average output length: {average_length}")
-# %%
+
