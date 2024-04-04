@@ -1,4 +1,6 @@
 .env
-*.csv
-*.xlsx
-*.log
+# *.csv
+# *.xlsx
+# *.log
+classification_glm3/*
+classification_gpt/*
